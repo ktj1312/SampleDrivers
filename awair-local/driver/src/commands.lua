@@ -18,65 +18,68 @@ end
 ------------------
 -- Refresh command
 function command_handler.refresh(_, device)
-  local success, data = command_handler.send_lan_command(
-    device.device_network_id,
-    'GET',
-    'refresh')
+  -- Define online status
+  device:online()
 
-  -- Check success
-  if success then
-    -- Monkey patch due to issues
-    -- on ltn12 lib to fully sink
-    -- JSON payload into table. Last
-    -- bracket is missing.
-    --
-    -- Update below when fixed:
-    --local raw_data = json.decode(table.concat(data))
-    local raw_data = json.decode(table.concat(data)..'}')
-    local calc_lvl = math.floor((raw_data.lvl * 100)/255)
+  local isSuccess = true
 
-    -- Define online status
-    device:online()
-
-    -- Refresh Switch Level
-    log.trace('Refreshing Switch Level')
-    device:emit_event(caps.switchLevel.level(calc_lvl))
-
-    -- Refresh Switch
-    log.trace('Refreshing Switch')
-    if calc_lvl == 0 then
-      device:emit_event(caps.switch.switch.off())
-    else
-      device:emit_event(caps.switch.switch.on())
-    end
-
-    -- Refresh Color Control
-    log.trace('Refreshing Color Control')
-    local calc_r = 255 - raw_data.clr.r
-    local calc_g = 255 - raw_data.clr.g
-    local calc_b = 255 - raw_data.clr.b
-    local hue, sta = utils.rgb_to_hsl(calc_r, calc_g, calc_b)
-    device:emit_event(caps.colorControl.saturation(sta))
-    device:emit_event(caps.colorControl.hue(hue))
-  else
-    log.error('failed to poll device state')
+  isSuccess = command_handler.update_airdata(device)
+  isSuccess = command_handler.update_device_status(device)
+  
+  if isSuccess ~= true then
     -- Set device as offline
     device:offline()
-  end
+end
+  
 end
 
 ------------------------
 -- Update Airdata Values
-function updateAirdata(resp)
-  device:emit_event(caps.airQualitySensor.airQuality(resp.score))
-  device:emit_event(caps.carbonDioxideMeasurement.carbonDioxide(resp.co2))
+function command_handler.update_airdata(device)
+  -- Refresh Airdata
+  log.trace('Refreshing Airdata')
+    
+  local success, data = command_handler.send_lan_command(
+    device.device_network_id,
+    'GET',
+    'air-data/latest')
+
+  local resp = json.decode(table.concat(data)..'}')
+
+  -- Check success
+  if success then
+    device:emit_event(caps.airQualitySensor.airQuality(resp.score))
+    device:emit_event(caps.carbonDioxideMeasurement.carbonDioxide(resp.co2))
+    return true
+  else
+    log.error('failed to poll air data')
+    return false
+  end
 end
 
 ------------------------
 -- Update Device Status
-function updateDeviceStatus(resp)
-  device:emit_event(caps.battery.battery(resp.score))
-  device:emit_event(caps.carbonDioxideMeasurement.carbonDioxide(resp.co2))
+function command_handler.update_device_status(device)
+  -- Refresh Device Status
+  log.trace('Refreshing Device Status')
+
+  local success, data = command_handler.send_lan_command(
+    device.device_network_id,
+    'GET',
+    'settings/config/data')
+
+  local resp = json.decode(table.concat(data)..'}')
+
+  -- Check success
+  if success then
+    log.trace(resp)
+    device:emit_event(caps.battery.battery(resp.score))
+    device:emit_event(caps.carbonDioxideMeasurement.carbonDioxide(resp.co2))
+    return true
+  else
+    log.error('failed to poll device state')
+    return false
+  end
 end
 
 ------------------------
