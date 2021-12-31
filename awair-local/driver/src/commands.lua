@@ -29,7 +29,7 @@ function command_handler.refresh(_, device)
   if isSuccess ~= true then
     -- Set device as offline
     device:offline()
-end
+  end
   
 end
 
