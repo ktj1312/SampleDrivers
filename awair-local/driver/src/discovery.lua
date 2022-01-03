@@ -18,29 +18,39 @@ end
 
 -- Fetching awair device metadata
 -- from SSDP Response Location header
-local function fetch_device_info(url, type)
+local function fetch_device_info(url)
+  local awair_info_url = url .. '/settings/config/data'
+  
+  log.trace('fetch_device_info request to url : ' .. awair_info_url)
+  
   local res = {}
-  local _, status = http.request({
-    url=url,
+  local _, code = http.request({
+    method='GET',
+    url=awair_info_url,
     sink=ltn12.sink.table(res)
   })
 
-  res = json.decode(table.concat(res)..'}')
+  if code == 200 then
+    res = json.decode(table.concat(res)..'}')
   
-  local modelName
-  if string.find(res.device_uuid, "awair-omni") then
-    modelName = 'AwairOmni'
+    local modelName
+    if string.find(res.device_uuid, "awair-omni") then
+      modelName = 'AwairOmni'
+    else
+      modelName = 'AwairR2'
+    end
+  
+    return {
+      name=modelName,
+      vendor='Awair Smart Air Management',
+      mn='Awair Co.',
+      model=modelName,
+      location=res.ip
+    }
   else
-    modelName = 'AwairR2'
+    log.error('failed to retrive info status ' .. code)
+    return nil
   end
-
-  return {
-    name=modelName,
-    vendor='Awair Smart Air Management',
-    mn='Awair Co.',
-    model=modelName,
-    location=url:sub(0, url:find('/'..meta.friendlyName)-1)
-  }
 end
 
 -- This function enables a UDP
@@ -105,13 +115,19 @@ function disco.start(driver, opts, cons)
   while true do
     local device_res = find_device()
 
+    log.trace(device_res)
+
     if device_res ~= nil then
       device_res = parse_ssdp(device_res)
       log.info('===== DEVICE FOUND IN NETWORK...')
       log.info('===== DEVICE LOCATED IP : '..device_res.location)
 
-      local device = fetch_device_info(device_res.location, device_res.device_type)
-      return create_device(driver, device)
+      local device = fetch_device_info(device_res.location)
+      if device ~= nil then
+        return create_device(driver, device)
+      else
+        log.error('===== DEVICE INFO RETRIVE FAIL =====')
+      end
     end
     log.error('===== DEVICE NOT FOUND IN NETWORK')
   end
