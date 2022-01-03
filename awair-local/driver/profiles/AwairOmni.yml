@@ -22,12 +22,8 @@ components:
     version: 1
   - id: powerSource
     version: 1
-  - id: soundPressureLevel
-    version: 1
   - id: refresh
     version: 1
-  categories:
-  - name: Air Quality Detector
 metadata:
   deviceType: Air Quality Detector
   ocfDeviceType: x.com.st.d.airqualitysensor

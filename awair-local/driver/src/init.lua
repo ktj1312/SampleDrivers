@@ -5,7 +5,6 @@ local caps = require('st.capabilities')
 local discovery = require('discovery')
 local lifecycles = require('lifecycles')
 local commands = require('commands')
-local server = require('server')
 
 --------------------
 -- Driver definition
@@ -26,12 +25,6 @@ local driver =
       }
     }
   )
-
------------------------------
--- Initialize Hub server
--- that will open port to
--- allow bidirectional comms.
-server.start(driver)
 
 --------------------
 -- Initialize Driver

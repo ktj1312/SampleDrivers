@@ -95,7 +95,7 @@ function command_handler.send_lan_command(url, method, path, body)
     url=dest_url..'?'..query,
     sink=ltn12.sink.table(res_body),
     headers={
-      ['Content-Type'] = 'application/x-www-urlencoded'
+      ['Accept'] = 'application/json'
     }})
 
   -- Handle response

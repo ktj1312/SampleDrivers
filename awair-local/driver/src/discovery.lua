@@ -3,9 +3,7 @@ local http = require('socket.http')
 local ltn12 = require('ltn12')
 local log = require('log')
 local config = require('config')
--- XML modules
-local xml2lua = require "xml2lua"
-local xml_handler = require "xmlhandler.tree"
+local json = require('dkjson')
 
 -----------------------
 -- SSDP Response parser
@@ -18,35 +16,29 @@ local function parse_ssdp(data)
   return res
 end
 
--- Fetching device metadata via
--- <device_location>/<device_name>.xml
+-- Fetching awair device metadata
 -- from SSDP Response Location header
-local function fetch_device_info(url)
-  log.info('===== FETCHING DEVICE METADATA...')
+local function fetch_device_info(url, type)
   local res = {}
   local _, status = http.request({
     url=url,
     sink=ltn12.sink.table(res)
   })
 
-  -- XML Parser
-  local xmlres = xml_handler:new()
-  local xml_parser = xml2lua.parser(xmlres)
-  xml_parser:parse(table.concat(res))
-
-  -- Device metadata
-  local meta = xmlres.root.root.device
-
-  if not xmlres.root or not meta then
-    log.error('===== FAILED TO FETCH METADATA AT: '..url)
-    return nil
+  res = json.decode(table.concat(res)..'}')
+  
+  local modelName
+  if string.find(res.device_uuid, "awair-omni") then
+    modelName = 'AwairOmni'
+  else
+    modelName = 'AwairR2'
   end
 
   return {
-    name=meta.friendlyName,
-    vendor=meta.UDN,
-    mn=meta.manufacturer,
-    model=meta.modelName,
+    name=modelName,
+    vendor='Awair Smart Air Management',
+    mn='Awair Co.',
+    model=modelName,
     location=url:sub(0, url:find('/'..meta.friendlyName)-1)
   }
 end
@@ -116,9 +108,9 @@ function disco.start(driver, opts, cons)
     if device_res ~= nil then
       device_res = parse_ssdp(device_res)
       log.info('===== DEVICE FOUND IN NETWORK...')
-      log.info('===== DEVICE DESCRIPTION AT: '..device_res.location)
+      log.info('===== DEVICE LOCATED IP : '..device_res.location)
 
-      local device = fetch_device_info(device_res.location)
+      local device = fetch_device_info(device_res.location, device_res.device_type)
       return create_device(driver, device)
     end
     log.error('===== DEVICE NOT FOUND IN NETWORK')
