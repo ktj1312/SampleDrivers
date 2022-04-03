@@ -19,38 +19,48 @@ end
 -- Fetching awair device metadata
 -- from SSDP Response Location header
 local function fetch_device_info(url)
-  local awair_info_url = url .. '/settings/config/data'
+  -- 현재 ST 드라이버 버그로 디바이스에서 정보 조회 로직 제거
+  -- https://community.smartthings.com/t/st-edge-issue-with-http-request-in-edge-drivers/236639
+  -- local awair_info_url = url .. '/settings/config/data'
   
-  log.trace('fetch_device_info request to url : ' .. awair_info_url)
+  -- log.trace('fetch_device_info request to url : ' .. awair_info_url)
   
-  local res = {}
-  local _, code = http.request({
-    method='GET',
-    url=awair_info_url,
-    sink=ltn12.sink.table(res)
-  })
+  -- local res = {}
+  -- local _, code = http.request({
+  --   method='GET',
+  --   url=awair_info_url,
+  --   sink=ltn12.sink.table(res)
+  -- })
 
-  if code == 200 then
-    res = json.decode(table.concat(res)..'}')
+  -- if code == 200 then
+  --   res = json.decode(table.concat(res)..'}')
   
-    local modelName
-    if string.find(res.device_uuid, "awair-omni") then
-      modelName = 'AwairOmni'
-    else
-      modelName = 'AwairR2'
-    end
+  --   local modelName
+  --   if string.find(res.device_uuid, "awair-omni") then
+  --     modelName = 'AwairOmni'
+  --   else
+  --     modelName = 'AwairR2'
+  --   end
   
-    return {
-      name=modelName,
-      vendor='Awair Smart Air Management',
-      mn='Awair Co.',
-      model=modelName,
-      location=res.ip
-    }
-  else
-    log.error('failed to retrive info status ' .. code)
-    return nil
-  end
+  --   return {
+  --     name=modelName,
+  --     vendor='Awair Smart Air Management',
+  --     mn='Awair Co.',
+  --     model=modelName,
+  --     location=res.ip
+  --   }
+  -- else
+  --   log.error('failed to retrive info status ' .. code)
+  --   return nil
+  -- end
+
+  return {
+    name='AwairOmni',
+    vendor='Awair Smart Air Management',
+    mn='Awair Co.',
+    model='AwairOmni',
+    location=url
+  }
 end
 
 -- This function enables a UDP
@@ -98,38 +108,58 @@ local function create_device(driver, device)
   return driver:try_create_device(metadata)
 end
 
--- Discovery service which will
--- invoke the above private functions.
---    - find_device
---    - parse_ssdp
---    - fetch_device_info
---    - create_device
---
--- This resource is linked to
--- driver.discovery and it is
--- automatically called when
--- user scan devices from the
--- SmartThings App.
+-- -- Discovery service which will
+-- -- invoke the above private functions.
+-- --    - find_device
+-- --    - parse_ssdp
+-- --    - fetch_device_info
+-- --    - create_device
+-- --
+-- -- This resource is linked to
+-- -- driver.discovery and it is
+-- -- automatically called when
+-- -- user scan devices from the
+-- -- SmartThings App.
+-- local disco = {}
+-- function disco.start(driver, opts, cons)
+--   while true do
+--     local device_res = find_device()
+
+--     log.trace(device_res)
+
+--     if device_res ~= nil then
+--       device_res = parse_ssdp(device_res)
+--       log.info('===== DEVICE FOUND IN NETWORK...')
+--       log.info('===== DEVICE LOCATED IP : '..device_res.location)
+
+--       local device = fetch_device_info(device_res.location)
+--       if device ~= nil then
+--         return create_device(driver, device)
+--       else
+--         log.error('===== DEVICE INFO RETRIVE FAIL =====')
+--       end
+--     end
+--     log.error('===== DEVICE NOT FOUND IN NETWORK')
+--   end
+-- end
+
+-- return disco
+
+
 local disco = {}
 function disco.start(driver, opts, cons)
-  while true do
-    local device_res = find_device()
+  local device_res = {}
+  -- device_res.location = 'http://192.168.1.2:49154'
+  device_res.location = 'http://192.168.1.21:80'
+  -- device_res.location = 'http://192.168.1.2:80'
 
-    log.trace(device_res)
+  log.info('===== DEVICE LOCATED IP : '..device_res.location)
 
-    if device_res ~= nil then
-      device_res = parse_ssdp(device_res)
-      log.info('===== DEVICE FOUND IN NETWORK...')
-      log.info('===== DEVICE LOCATED IP : '..device_res.location)
-
-      local device = fetch_device_info(device_res.location)
-      if device ~= nil then
-        return create_device(driver, device)
-      else
-        log.error('===== DEVICE INFO RETRIVE FAIL =====')
-      end
-    end
-    log.error('===== DEVICE NOT FOUND IN NETWORK')
+  local device = fetch_device_info(device_res.location)
+  if device ~= nil then
+    return create_device(driver, device)
+  else
+    log.error('===== DEVICE INFO RETRIVE FAIL =====')
   end
 end
 

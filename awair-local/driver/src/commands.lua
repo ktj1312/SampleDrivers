@@ -8,13 +8,6 @@ local ltn12 = require('ltn12')
 
 local command_handler = {}
 
----------------
--- Ping command
-function command_handler.ping(address, port, device)
-  local ping_data = {ip=address, port=port, ext_uuid=device.id}
-  return command_handler.send_lan_command(
-    device.device_network_id, 'POST', 'ping', ping_data)
-end
 ------------------
 -- Refresh command
 function command_handler.refresh(_, device)
@@ -44,10 +37,13 @@ function command_handler.update_airdata(device)
     'GET',
     'air-data/latest')
 
-  local resp = json.decode(table.concat(data)..'}')
+    log.trace(data)
 
   -- Check success
   if success then
+    log.trace(data)
+    local resp = json.decode(table.concat(data)..'}')
+
     device:emit_event(caps.airQualitySensor.airQuality(resp.score))
     device:emit_event(caps.carbonDioxideMeasurement.carbonDioxide(resp.co2))
     return true
@@ -68,11 +64,13 @@ function command_handler.update_device_status(device)
     'GET',
     'settings/config/data')
 
-  local resp = json.decode(table.concat(data)..'}')
+    log.trace(data)
 
   -- Check success
   if success then
-    log.trace(resp)
+    log.trace(data)
+    local resp = json.decode(table.concat(data)..'}')
+    
     device:emit_event(caps.battery.battery(resp.score))
     device:emit_event(caps.carbonDioxideMeasurement.carbonDioxide(resp.co2))
     return true
@@ -84,19 +82,25 @@ end
 
 ------------------------
 -- Send LAN HTTP Request
-function command_handler.send_lan_command(url, method, path, body)
+function command_handler.send_lan_command(url, method, path)
   local dest_url = url..'/'..path
-  local query = neturl.buildQuery(body or {})
   local res_body = {}
+
+  log.trace('request to ' ..dest_url..' method ' ..method)
 
   -- HTTP Request
   local _, code = http.request({
     method=method,
-    url=dest_url..'?'..query,
+    url=dest_url,
     sink=ltn12.sink.table(res_body),
     headers={
       ['Accept'] = 'application/json'
+      -- ,
+      -- ['connection'] = '',
+      -- ['te'] = ''
     }})
+
+  log.trace('response code ' ..code)
 
   -- Handle response
   if code == 200 then
